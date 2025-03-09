@@ -22,4 +22,8 @@ Visit https://fer14.github.io/cardcrop to try CardCrop now!
 - Processing large images may take a few moments if there are multiple cards
 
 
+
+https://github.com/user-attachments/assets/d5aec59c-ae9e-4b5d-9075-7bcee8c1188a
+
+
 Made with ❤️ by [Fer]
