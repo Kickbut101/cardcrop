@@ -464,22 +464,57 @@
           cv.cvtColor(src, gray, cv.COLOR_RGBA2GRAY);
           const thresh = new cv.Mat();
           cv.threshold(gray, thresh, 240, 255, cv.THRESH_BINARY_INV);
-          
+
+          let blur = new cv.Mat();
+          let ksize = new cv.Size(5, 5);
+          cv.GaussianBlur(gray, blur, ksize, 0, 0, cv.BORDER_DEFAULT);
+
+          let edges = new cv.Mat();
+          cv.Canny(blur, edges, 75, 200);
+
+          // Create a 3x3 kernel filled with 1s
+          let kernel = cv.Mat.ones(3, 3, cv.CV_8U);
+
+          // Prepare the output matrix
+          let dilated_frame = new cv.Mat();
+
+          // Apply dilation
+          cv.dilate(edges, dilated_frame, kernel, new cv.Point(-1, -1), 1, cv.BORDER_CONSTANT, cv.morphologyDefaultBorderValue());
+
           // Find contours from the thresholded image
-          const contours = new cv.MatVector();
+          const contoursall = new cv.MatVector();
           const hierarchy = new cv.Mat();
-          cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+          //cv.findContours(thresh, contours, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
+          cv.findContours(dilated_frame, contoursall, hierarchy, cv.RETR_EXTERNAL, cv.CHAIN_APPROX_SIMPLE);
           
+          // Filter out contours that are not viable by relative size
+          let ratio = 0.05; // contours that take up at least 15% of image size.
+          let minArea = Math.round(imgData.width * imgData.height * ratio);
+          let contours = [];
+
+          for (let i = 0; i < contoursall.size(); i++) {
+            let contour = contoursall.get(i);
+            if (cv.contourArea(contour) >= minArea) {
+              contours.push(contour); // Keep it
+            } else {
+              contour.delete(); // Discard small one to free memory
+            }
+          }
+
+          contours.sort((c1, c2) => {
+            return cv.contourArea(c2) - cv.contourArea(c1);
+          });
+
           // Remove temporary canvas
           document.body.removeChild(canvas);
           
           // Clear previous results
           previewItems.innerHTML = '';
           
-          if (contours.size() === 0) {
+          if (contours.length === 0) {
             showStatus('No cards detected in the image. Try an image with more contrast.', 'error');
             loading.classList.add('hidden');
-            src.delete(); gray.delete(); thresh.delete(); contours.delete(); hierarchy.delete();
+            try {src.delete(); gray.delete(); thresh.delete(); contours.delete(); hierarchy.delete();} catch {}
             return;
           }
           
@@ -487,8 +522,8 @@
           let validcardCount = 0;
           
           // Process each detected contour
-          for (let i = 0; i < contours.size(); i++) {
-            const contour = contours.get(i);
+          for (let i = 0; i < contours.length; i++) {
+            const contour = contours[i];
             const rect = cv.boundingRect(contour);
             
             // Ignore very small contours
@@ -601,7 +636,7 @@
           showStatus(`Successfully detected ${validcardCount} card${validcardCount !== 1 ? 's' : ''}.`, 'success');
           
           // Clean up Mats
-          src.delete(); gray.delete(); thresh.delete(); contours.delete(); hierarchy.delete();
+          try {src.delete(); gray.delete(); thresh.delete(); hierarchy.delete(); blur.delete(); dilated_frame.delete(); kernel.delete(); } catch {}
           
         } catch (err) {
           console.error(err);
