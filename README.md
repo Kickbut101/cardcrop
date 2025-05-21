@@ -1,1 +1,1 @@
-Small edit from repo to include different methods for detection.
+Small edit from repo to include a different method for detection.
